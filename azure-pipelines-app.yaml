@@ -1,8 +1,11 @@
 trigger:
 - main
 
+trigger:
+- main
+
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'MyLaptopPool' # Use your local agent instead of Microsoft-hosted agents
 
 variables:
   # Container Registry Config (Needs "Docker Registry" Connection)
