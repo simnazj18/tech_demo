@@ -1,7 +1,7 @@
 trigger: none # Triggered automatically by Logic App/Function, not commits
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'MyLaptopPool'
 
 parameters:
 - name: SecretName
