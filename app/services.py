@@ -41,7 +41,7 @@ class SecretScanner:
     def get_akv_secrets(self) -> List[Dict[str, Any]]:
         """Fetch all secret metadata from Azure Key Vault."""
         if not self.kv_client:
-            return [{"name": "Error: Azure not connected", "enabled": False}]
+            return [{"name": "Error: Azure not connected", "enabled": False, "value": None}]
         
         secrets = []
         try:
@@ -173,7 +173,7 @@ class SecretScanner:
             # First, try to match by value if we have it
             if usage.get('value'):
                 for akv in akv_secrets:
-                    if akv['value'] == usage['value']:
+                    if akv.get('value') == usage.get('value'):
                         dashboard_rows[-1]['akv_status'] = f"Synced with: {akv['name']}"
                         dashboard_rows[-1]['akv_value'] = akv['value']
                         match_found = True
