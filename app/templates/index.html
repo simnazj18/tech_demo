@@ -1,291 +1,460 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secrets Runtime Dashboard</title>
-    <!-- Bootstrap 5.3 CSS -->
+    <title>Secrets Drift Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <!-- Icons -->
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at top left, #1a1c29, #0f1016);
-            min-height: 100vh;
-            color: #e0e0e0;
-        }
-
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .navbar {
-            background: rgba(15, 16, 22, 0.8) !important;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .card {
-            background: transparent;
-            border: none;
-        }
-
-        .status-badge {
-            font-size: 0.8em;
-            padding: 0.4em 0.8em;
-            border-radius: 20px;
-        }
-
-        .status-ok {
-            background: rgba(25, 135, 84, 0.2);
-            color: #75b798;
-            border: 1px solid rgba(25, 135, 84, 0.3);
-        }
-
-        .status-warn {
-            background: rgba(255, 193, 7, 0.1);
-            color: #ffda6a;
-            border: 1px solid rgba(255, 193, 7, 0.2);
-        }
-
-        .status-err {
-            background: rgba(220, 53, 69, 0.2);
-            color: #ea868f;
-            border: 1px solid rgba(220, 53, 69, 0.3);
-        }
-
-        .table-custom {
-            --bs-table-bg: transparent;
-            --bs-table-color: #e0e0e0;
-            --bs-table-border-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .table-custom th {
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-            opacity: 0.7;
-        }
-    </style>
+    <link href="/static/css/styles.css" rel="stylesheet">
 </head>
 
-<body>
+<body class="bg-dark text-light">
 
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                <i class="bi bi-shield-lock-fill text-primary"></i>
-                <span class="fw-bold">SecretsOps</span>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark-subtle border-bottom border-secondary shadow-lg px-4 sticky-top"
+        style="backdrop-filter: blur(10px); background: rgba(15, 23, 42, 0.9);">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+                <i class="bi bi-shield-lock-fill text-info fs-4"></i>
+                <span class="fw-bold tracking-tight">Secrets Drift</span>
             </a>
-            <span class="navbar-text ms-auto text-muted small">
-                <i class="bi bi-cloud-check me-1"></i> Connected to Azure Key Vault
-            </span>
+
+            <div class="d-flex align-items-center gap-3">
+                <!-- Account Selector -->
+                {% if user %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 text-light"
+                        type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-cloud-fill text-primary"></i>
+                        {% if selected_account %}{{ selected_account.name }}{% else %}Select Cloud Account{% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg">
+                        <li class="dropdown-header text-uppercase small fw-bold text-muted">My Accounts</li>
+                        {% for acc in accounts %}
+                        <li><a class="dropdown-item {% if selected_account and selected_account.id == acc.id %}active{% endif %}"
+                                href="/?account_id={{ acc.id }}&service_type={{ service_type }}">
+                                {{ acc.name }}
+                            </a></li>
+                        {% endfor %}
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item text-info fw-bold" href="#" data-bs-toggle="modal"
+                                data-bs-target="#addAccountModal">
+                                <i class="bi bi-plus-circle me-1"></i> Add Account
+                            </a></li>
+                    </ul>
+                </div>
+
+                <!-- Service Selector -->
+                {% if selected_account and service_type %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 text-light"
+                        type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-layers-fill text-warning"></i>
+                        {% if service_type == 'aks' %}Kubernetes (AKS)
+                        {% else %}All Services{% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg">
+                        <li><a class="dropdown-item {% if service_type == 'all' %}active{% endif %}"
+                                href="/?account_id={{ selected_account.id }}&service_type=all">All Services</a></li>
+                        <li><a class="dropdown-item {% if service_type == 'aks' %}active{% endif %}"
+                                href="/?account_id={{ selected_account.id }}&service_type=aks">Kubernetes (AKS)</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="vr bg-secondary"></div>
+
+                <!-- User Profile -->
+                <div class="dropdown">
+                    <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
+                        data-bs-toggle="dropdown">
+                        <div class="bg-info rounded-circle d-flex align-items-center justify-content-center text-dark fw-bold me-2"
+                            style="width: 32px; height: 32px;">
+                            {{ user.username[0] | upper }}
+                        </div>
+                        <span class="d-none d-sm-inline">{{ user.username }}</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow-lg">
+                        <li><a class="dropdown-item text-danger" href="#" onclick="logout()"><i
+                                    class="bi bi-box-arrow-right me-2"></i> Sign out</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="container-fluid px-4 py-5 mt-5">
-
-        <!-- Header -->
-        <div class="row mb-4 animate-fade-in">
-            <div class="col-md-8">
-                <h2 class="fw-bold fs-3 mb-1">Runtime Drift Detection</h2>
-                <p class="text-secondary">Real-time correlation between Kubernetes workloads and Azure Key Vault.</p>
-            </div>
-            <div class="col-md-4 text-end align-self-end">
-                <button class="btn btn-primary btn-sm rounded-pill px-3" onclick="location.reload()">
-                    <i class="bi bi-arrow-clockwise me-1"></i> Refresh Scan
+    <div class="container-fluid py-4 px-4">
+        {% if not selected_account %}
+        <!-- Empty State / Welcome -->
+        <div class="d-flex flex-column align-items-center justify-content-center min-vh-50 mt-5 pt-5">
+            <div class="text-center p-5 rounded-4 bg-dark-subtle border border-secondary shadow-lg"
+                style="max-width: 600px;">
+                <i class="bi bi-cloud-plus text-secondary display-1 mb-4"></i>
+                <h2 class="fw-bold mb-3">Welcome to Secrets Drift Dashboard</h2>
+                <p class="text-muted lead mb-4">You need to select or add an Azure Account to verify start scanning your
+                    secrets.</p>
+                <button class="btn btn-primary btn-lg rounded-pill" data-bs-toggle="modal"
+                    data-bs-target="#addAccountModal">
+                    <i class="bi bi-plus-lg me-2"></i> Connect Azure Account
                 </button>
             </div>
-        </div>
-
-        <!-- Metrics Cards -->
-        <div class="row g-4 mb-5">
-            <div class="col-md-4">
-                <div class="glass-panel p-4 h-100">
-                    <h6 class="text-uppercase text-secondary mb-3 small fw-bold">Active Secrets (K8s)</h6>
-                    <div class="d-flex align-items-baseline gap-2">
-                        <span class="display-5 fw-bold">{{ k8s_usage|length }}</span>
-                        <span class="text-success"><i class="bi bi-arrow-up-short"></i></span>
+            {% elif not service_type %}
+            <!-- Service Selection Mode (Dropdown) -->
+            <div class="d-flex flex-column align-items-center justify-content-center min-vh-50 mt-5 pt-5">
+                <div class="p-5 rounded-4 bg-dark-subtle border border-secondary shadow-lg text-center"
+                    style="max-width: 500px; width: 100%;">
+                    <div class="mb-4 text-warning">
+                        <i class="bi bi-diagram-3-fill display-1"></i>
                     </div>
+                    <h2 class="fw-bold mb-3 text-white">Select Service</h2>
+                    <p class="text-muted mb-4">Choose the service environment to inspect secrets.</p>
+
+                    <form action="/" method="get" class="d-grid gap-3">
+                        <input type="hidden" name="account_id" value="{{ selected_account.id }}">
+
+                        <div class="form-floating text-dark">
+                            <select class="form-select" id="serviceSelect" name="service_type" required>
+                                <option value="" selected disabled>Choose a service...</option>
+                                <option value="aks">Azure Kubernetes Service (AKS)</option>
+                            </select>
+                            <label for="serviceSelect">Service Type</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning btn-lg fw-bold w-100">
+                            Inspect Service <i class="bi bi-arrow-right list-inline-item ms-1"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="col-md-12 h-100"> <!-- Fix nesting -->
-                    <div class="glass-panel p-4 h-100">
-                        <h6 class="text-uppercase text-secondary mb-3 small fw-bold">Managed in AKV</h6>
-                        <div class="d-flex align-items-baseline gap-2">
-                            <span class="display-5 fw-bold">{{ akv_secrets|length }}</span>
-                            <span class="text-primary small overlay-text">Sources</span>
+
+            {% else %}
+
+            <!-- Dashboard Content (Only if Account Selected) -->
+
+            <!-- Alerts -->
+            {% if request.query_params.get('success') %}
+            <div class="alert alert-success border-0 bg-success-subtle text-success-emphasis alert-dismissible fade show mb-4"
+                role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> {{ request.query_params.get('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+            {% if request.query_params.get('error') %}
+            <div class="alert alert-danger border-0 bg-danger-subtle text-danger-emphasis alert-dismissible fade show mb-4"
+                role="alert">
+                <i class="bi bi-exclamation-octagon-fill me-2"></i> {{ request.query_params.get('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <div class="row align-items-center mb-4">
+                <div class="col">
+                    <h2 class="fw-bold mb-0">Dashboard Overview</h2>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <span class="status-badge status-ok"><i class="bi bi-check-circle me-1"></i> Autoscan
+                            Active</span>
+                        <span class="text-muted small">| Account: <span class="text-info">{{ selected_account.name
+                                }}</span></span>
+                        <span class="text-muted small">| Tenant: {{ selected_account.tenant_id }}</span>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <button onclick="refreshData()" class="btn btn-outline-info btn-sm rounded-pill px-3">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh Scan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="row g-4 mb-5">
+                {% if service_type == 'all' or service_type == 'akv' %}
+                <div class="col-md-3">
+                    <div class="stat-card p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-secondary text-uppercase small fw-bold mb-1">Total Secrets</div>
+                                <div class="display-5 fw-bold text-white">{{ akv_secrets|length }}</div>
+                            </div>
+                            <div class="icon-box bg-primary-subtle text-primary">
+                                <i class="bi bi-key-fill fs-4"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
+                {% endif %}
+                <!-- Add other stats logic if needed -->
             </div>
-            <div class="col-md-4">
-                <div class="glass-panel p-4 h-100">
-                    <h6 class="text-uppercase text-secondary mb-3 small fw-bold">Drift Status</h6>
-                    <div class="d-flex align-items-baseline gap-2">
-                        <!-- Mock Logic for Drift Status Visual -->
-                        {% set drift_count = 0 %}
-                        {% for row in k8s_usage %}
-                        {% if 'Found' not in row.akv_status %}
-                        {% set drift_count = drift_count + 1 %}
-                        {% endif %}
-                        {% endfor %}
 
-                        {% if drift_count == 0 %}
-                        <span class="fs-4 fw-bold text-success">Synced</span>
-                        <i class="bi bi-check-circle-fill text-success"></i>
-                        {% else %}
-                        <span class="fs-4 fw-bold text-warning">{{ drift_count }} Unknown</span>
-                        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-                        {% endif %}
+            <!-- Tables Row -->
+            <div class="row g-4">
+                <!-- K8s Usage -->
+                {% if service_type == 'all' or service_type == 'aks' %}
+                <div class="{% if service_type == 'aks' %}col-12{% else %}col-xl-6{% endif %}">
+                    <div class="card h-100 border-secondary bg-dark-subtle shadow-sm">
+                        <div
+                            class="card-header border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2 text-warning"></i>Detected Secrets
+                                Usage
+                                (AKS)</h5>
+                            <span class="badge bg-dark border border-secondary">{{ k8s_usage|length }} Workloads</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover mb-0 align-middle">
+                                <thead class="text-secondary text-uppercase small">
+                                    <tr>
+                                        <th class="ps-4">Workload Pod</th>
+                                        <th>Mechanism</th>
+                                        <th>K8s Secret</th>
+                                        <th>AKV Status</th>
+                                        <th>Drift Status</th>
+                                        <th class="text-end pe-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in k8s_usage %}
+                                    <tr>
+                                        <td class="ps-4 align-top pt-3">
+                                            <div class="fw-bold text-light">{{ row.service_pod }}</div>
+                                            <div class="small text-muted mt-1"><i class="bi bi-diagram-2 me-1"></i>{{
+                                                row.deployment if row.deployment else 'Standalone' }}</div>
+                                        </td>
+                                        <td><span
+                                                class="badge bg-secondary-subtle text-secondary rounded-pill font-monospace">{{
+                                                row.mechanism }}</span></td>
+                                        <td><span class="font-monospace text-info">{{ row.k8s_secret }}</span></td>
+                                        <td>
+                                            {% if 'Synced' in row.akv_status %}
+                                            <span class="text-success"><i class="bi bi-link-45deg me-1"></i>{{
+                                                row.akv_status }}</span>
+                                            {% elif 'Drift' in row.akv_status or 'Found' in row.akv_status %}
+                                            <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>{{
+                                                row.akv_status }}</span>
+                                            {% else %}
+                                            <span class="text-danger small fst-italic">No mappings found</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if 'Synced' in row.akv_status %}
+                                            <span class="text-success">Synced</span>
+                                            {% elif 'Drift' in row.akv_status %}
+                                            <span class="text-warning">Drift Detected</span>
+                                            {% else %}
+                                            <span class="text-muted">Missing</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            {% if row.akv_name_ref %}
+                                            {% if (row.days_remaining is not none and row.days_remaining <= 7)
+                                                or 'Critical' in row.akv_expiry_status or 'Warning' in
+                                                row.akv_expiry_status %} <button
+                                                class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 ms-auto"
+                                                data-bs-toggle="modal" data-bs-target="#rotateModal{{ loop.index }}">
+                                                <i class="bi bi-arrow-repeat"></i> Rotate
+                                                </button>
+                                                {% else %}
+                                                <span
+                                                    class="badge bg-success-subtle text-success border border-success-subtle"><i
+                                                        class="bi bi-check2 me-1"></i>Healthy</span>
+                                                {% endif %}
+
+                                                <!-- Rotation Modal -->
+                                                <div class="modal fade" id="rotateModal{{ loop.index }}" tabindex="-1">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content bg-dark border-secondary text-start">
+                                                            <div class="modal-header border-secondary">
+                                                                <h5 class="modal-title text-warning">Confirm Safe
+                                                                    Rotation</h5>
+                                                                <button type="button" class="btn-close btn-close-white"
+                                                                    data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <p>Rotating <strong>{{ row.akv_name_ref }}</strong>.</p>
+                                                                <form action="/secrets/rotate" method="POST"
+                                                                    onsubmit="showSpinner(this)">
+                                                                    <input type="hidden" name="account_id"
+                                                                        value="{{ selected_account.id }}">
+                                                                    <input type="hidden" name="akv_secret_name"
+                                                                        value="{{ row.akv_name_ref }}">
+                                                                    <input type="hidden" name="k8s_secret_name"
+                                                                        value="{{ row.k8s_secret }}">
+                                                                    <input type="hidden" name="deployment_name"
+                                                                        value="{{ row.deployment }}">
+
+                                                                    <div class="mb-3">
+                                                                        <label
+                                                                            class="form-label text-secondary small">New
+                                                                            Secret Value</label>
+                                                                        <input type="text" name="new_secret_value"
+                                                                            class="form-control bg-dark text-light border-secondary"
+                                                                            placeholder="Auto-generate">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label
+                                                                            class="form-label text-secondary small">New
+                                                                            Expiry Date</label>
+                                                                        <input type="date" name="new_expiry_date"
+                                                                            class="form-control bg-dark text-light border-secondary">
+                                                                    </div>
+                                                                    <button type="submit"
+                                                                        class="btn btn-warning fw-bold w-100">Rotate &
+                                                                        Restart</button>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% else %}
+                                                <span class="badge bg-secondary text-dark">No Link</span>
+                                                {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+                </div>
+                {% endif %}
+
+                <!-- Vault Inventory -->
+                {% if service_type == 'all' or service_type == 'akv' or service_type == 'aks' %}
+                <div class="{% if service_type == 'akv' %}col-12{% else %}col-xl-6{% endif %}">
+                    <div class="card h-100 border-secondary bg-dark-subtle shadow-sm">
+                        <div
+                            class="card-header border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-safe2 me-2 text-info"></i>Vault Inventory</h5>
+                            <a href="{{ selected_account.keyvault_url }}" target="_blank"
+                                class="btn btn-sm btn-outline-secondary">
+                                Open Azure <i class="bi bi-box-arrow-up-right ms-1"></i>
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover mb-0 align-middle">
+                                <thead class="text-secondary text-uppercase small">
+                                    <tr>
+                                        <th class="ps-4">Secret Name</th>
+                                        <th>Value</th>
+                                        <th>Expiry</th>
+                                        <th>Status</th>
+                                        <th class="text-end pe-4">Updated</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for secret in akv_secrets %}
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-info">{{ secret.name }}</td>
+                                        <td class="font-monospace text-warning">******</td>
+                                        <td>
+                                            {% if secret.days_remaining is not none %}
+                                            <span
+                                                class="{% if secret.days_remaining <= 2 %}text-danger fw-bold{% elif secret.days_remaining <= 7 %}text-warning fw-bold{% else %}text-success{% endif %}">
+                                                {{ secret.expires_on.strftime('%Y-%m-%d') }}
+                                                <small class="ms-1">({{ secret.days_remaining }}d)</small>
+                                            </span>
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if secret.status == 'Critical' %}
+                                            <span class="badge bg-danger">Critical</span>
+                                            {% elif secret.status == 'Warning' %}
+                                            <span class="badge bg-warning text-dark">Expiring Soon</span>
+                                            {% elif secret.status == 'Healthy' %}
+                                            <span class="badge bg-success">Healthy</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ secret.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-4 text-muted small">{{
+                                            secret.updated_on.strftime('%Y-%m-%d')
+                                            if secret.updated_on else '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Add Account Modal -->
+        <div class="modal fade" id="addAccountModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content bg-dark border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-white">Add Azure Account</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="/accounts/add" method="POST">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label text-secondary">Account Alias</label>
+                                <input type="text" name="name" class="form-control bg-dark text-white border-secondary"
+                                    placeholder="e.g. Production Env" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-secondary">Key Vault URL</label>
+                                <input type="url" name="kv_url" class="form-control bg-dark text-white border-secondary"
+                                    placeholder="https://my-vault.vault.azure.net/" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-secondary">Tenant ID</label>
+                                <input type="text" name="tenant_id"
+                                    class="form-control bg-dark text-white border-secondary" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-secondary">Client ID (SPN)</label>
+                                <input type="text" name="client_id"
+                                    class="form-control bg-dark text-white border-secondary" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-secondary">Client Secret</label>
+                                <input type="password" name="client_secret"
+                                    class="form-control bg-dark text-white border-secondary" required>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Connection</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
 
-        <!-- Main Table -->
-        <div class="glass-panel p-0 overflow-hidden">
-            <div class="p-4 border-bottom border-light border-opacity-10">
-                <h5 class="mb-0">Detected Secrets Usage</h5>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-custom table-hover mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th class="ps-4">Service / Pod</th>
-                            <th>Check Mechanism</th>
-                            <th>K8s Secret Name</th>
-                            <th>AKV Secret Value</th>
-                            <th>AKV Correlation</th>
-                            <th class="text-end pe-4">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in k8s_usage %}
-                        <tr>
-                            <td class="ps-4">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="bg-primary bg-opacity-10 p-2 rounded-circle text-primary">
-                                        <i class="bi bi-box-seam"></i>
-                                    </div>
-                                    <span class="fw-semibold">{{ row.service_pod }}</span>
-                                </div>
-                            </td>
-                            <td><span class="badge bg-dark border border-secondary text-secondary">{{ row.mechanism
-                                    }}</span></td>
-                            <td class="font-monospace text-info">{{ row.k8s_secret }}</td>
-                            <td class="font-monospace text-warning">
-                                {% if row.akv_value %}
-                                <span title="Value Hidden">******</span>
-                                {% else %}
-                                <span class="text-muted small">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if 'Found' in row.akv_status or 'Synced' in row.akv_status %}
-                                <span class="text-light"><i class="bi bi-link-45deg me-1"></i> {{ row.akv_status
-                                    }}</span>
-                                {% else %}
-                                <span class="text-muted fst-italic">{{ row.akv_status }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end pe-4">
-                                {% if 'Found' in row.akv_status or 'Synced' in row.akv_status %}
-                                <span class="status-badge status-ok">Synced <i class="bi bi-check2"></i></span>
-                                {% else %}
-                                <span class="status-badge status-err">Drift Detected</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                <i class="bi bi-search display-6 d-block mb-3 opacity-25"></i>
-                                No secrets usage detected in current namespace.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div
-                class="p-3 bg-dark bg-opacity-25 border-top border-light border-opacity-10 text-center text-secondary small">
-                Scanning Namespace: <strong>default</strong> • Vault ID: {{ vault_url }}
-            </div>
-        </div>
-
-        <!-- AKV Inventory Section -->
-        <h5 class="mb-3 mt-5">Vault Inventory</h5>
-        <div class="glass-panel p-0 overflow-hidden">
-            <div class="table-responsive">
-                <table class="table table-custom table-hover mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th class="ps-4">Secret Name</th>
-                            <th>Value</th>
-                            <th>Expiry</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Last Updated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for secret in akv_secrets %}
-                        <tr>
-                            <td class="ps-4 fw-bold text-info">{{ secret.name }}</td>
-                            <td class="font-monospace text-warning">
-                                <span title="Value Hidden">******</span>
-                            </td>
-                            <td>
-                                {% if secret.expires_on %}
-                                {% if secret.days_remaining is not none and secret.days_remaining <= 1 %} <span
-                                    class="status-badge status-err">Critical ({{ secret.days_remaining }} days)</span>
-                                    {% else %}
-                                    <span class="text-muted small">{{ secret.expires_on.strftime('%Y-%m-%d') }}</span>
-                                    {% endif %}
-                                    {% else %}
-                                    <span class="text-secondary small">Never</span>
-                                    {% endif %}
-                            </td>
-                            <td>
-                                {% if secret.status == "Expiring Soon (Auto-Rotation Triggered)" %}
-                                <span class="status-badge status-err">Rotating... <i
-                                        class="bi bi-arrow-repeat spin"></i></span>
-                                {% elif secret.enabled %}
-                                <span class="status-badge status-ok">Enabled</span>
-                                {% else %}
-                                <span class="status-badge status-err">Disabled</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end pe-4 text-muted small">{{ secret.updated_on.strftime('%Y-%m-%d') if
-                                secret.updated_on else '-' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="text-center text-muted py-3">No secrets found in Vault.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            function refreshData() {
+                window.location.reload();
+            }
+            function logout() {
+                document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                window.location.href = '/login';
+            }
+            function showSpinner(form) {
+                const btn = form.querySelector('button[type="submit"]');
+                const spinner = btn.querySelector('.spinner-border');
+                const text = btn.querySelector('.btn-text');
+                spinner.classList.remove('d-none');
+                text.textContent = 'Rotating...';
+                btn.disabled = true;
+            }
+        </script>
 </body>
 
 </html>
