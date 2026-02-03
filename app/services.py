@@ -181,8 +181,13 @@ class SecretScanner:
 
     def get_dashboard_data(self):
         """Aggregate data for the dashboard (Flat Layout)."""
+        print("DEBUG: Starting AKV Scan...")
         akv_secrets = self.get_akv_secrets()
+        print(f"DEBUG: AKV Scan Complete. Found {len(akv_secrets)} secrets.")
+        
+        print("DEBUG: Starting K8s Scan...")
         k8s_usage = self.get_k8s_usage()
+        print(f"DEBUG: K8s Scan Complete. Found {len(k8s_usage)} usages.")
         
         dashboard_rows = []
         for usage in k8s_usage:

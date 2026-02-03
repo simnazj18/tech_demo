@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     AZURE_TENANT_ID: str = ""
+    AZURE_CLIENT_ID: str = ""
+    AZURE_CLIENT_SECRET: str = ""
+    AZURE_KEYVAULT_URL: str = ""
     
     # Database & Security
     SQL_DATABASE_URL: str = "mssql+pyodbc://adminUser:P@ssw0rd123!@sql-server:1433/TechDemoDB?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"

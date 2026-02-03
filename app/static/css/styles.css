@@ -1,0 +1,77 @@
+/* Global Styles */
+body {
+    background-color: #0f172a;
+    /* Slate 900 */
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Glassmorphism / Cards */
+.stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.icon-box {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 0.35em 0.8em;
+    border-radius: 30px;
+    font-size: 0.85em;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.status-ok {
+    background: rgba(25, 135, 84, 0.15);
+    color: #75b798;
+    border: 1px solid rgba(25, 135, 84, 0.2);
+}
+
+.status-warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffda6a;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.status-critical {
+    background: rgba(220, 53, 69, 0.15);
+    color: #ea868f;
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+/* Navbar */
+.navbar {
+    z-index: 2000;
+    /* Ensure it stays on top */
+}
+
+/* Service Selection Container */
+.min-vh-50 {
+    min-height: 50vh;
+    position: relative;
+    z-index: 10;
+}
+
+/* Table Enhancements */
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
