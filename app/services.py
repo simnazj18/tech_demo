@@ -5,6 +5,12 @@ from azure.identity import DefaultAzureCredential, ClientSecretCredential
 from azure.keyvault.secrets import SecretClient
 from kubernetes import client, config
 import base64
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import json
+from app.config import Settings
+settings = Settings()
 
 
 class SecretScanner:
@@ -51,6 +57,60 @@ class SecretScanner:
             print(f"Failed to load K8s config: {e}")
             self.v1 = None
 
+    def send_email_alert(self, secret_name: str, days_remaining: int):
+        """Send an email notification via SMTP."""
+        smtp_server = settings.SMTP_SERVER
+        smtp_port = settings.SMTP_PORT
+        sender_email = settings.ALERT_SENDER_EMAIL
+        receiver_email = settings.ALERT_RECEIVER_EMAIL
+        password = settings.SMTP_PASSWORD
+
+        if not smtp_server or not sender_email or not receiver_email:
+            print("Warning: SMTP settings not fully configured. Skipping email alert.")
+            return
+
+        message = MIMEMultipart("alternative")
+        message["Subject"] = f"🔥 Critical Secret Expiry: {secret_name}"
+        message["From"] = sender_email
+        message["To"] = receiver_email
+
+        text = f"""
+        CRITICAL SECRET EXPIRY WARNING
+        
+        Secret Name: {secret_name}
+        Days Remaining: {days_remaining}
+        Status: CRITICAL
+        
+        Please rotate this secret immediately.
+        """
+        
+        html = f"""
+        <html>
+          <body>
+            <h2 style="color: #d70000;">🔥 Critical Secret Expiry Warning</h2>
+            <p><strong>Secret Name:</strong> {secret_name}</p>
+            <p><strong>Days Remaining:</strong> {days_remaining}</p>
+            <p><strong>Status:</strong> CRITICAL</p>
+            <p>Please rotate this secret immediately.</p>
+          </body>
+        </html>
+        """
+
+        part1 = MIMEText(text, "plain")
+        part2 = MIMEText(html, "html")
+        message.attach(part1)
+        message.attach(part2)
+
+        try:
+            # Connect to SMTP Server
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(sender_email, password)
+                server.sendmail(sender_email, receiver_email, message.as_string())
+            print(f"Email alert sent for {secret_name} to {receiver_email}")
+        except Exception as e:
+            print(f"Error sending Email alert: {e}")
+
     def get_akv_secrets(self) -> List[Dict[str, Any]]:
         """Fetch all secret metadata from Azure Key Vault."""
         if not self.kv_client:
@@ -80,6 +140,8 @@ class SecretScanner:
                          days_remaining = 0 # or negative? Let's keep 0 for simplified logic
                     elif days_remaining <= 2:
                         expiry_status = "Critical" # < 2 days
+                        # Trigger Alert
+                        self.send_email_alert(s.name, days_remaining)
                     elif days_remaining <= 7:
                         expiry_status = "Warning" # < 7 days
                 
@@ -191,6 +253,8 @@ class SecretScanner:
         
         dashboard_rows = []
         for usage in k8s_usage:
+            print(f"DEBUG USAGE: Secret={usage['secret_name']} Key={usage.get('key')} Val={usage.get('value')}...")
+            
             row = {
                 "service_pod": usage['pod'],
                 "deployment": usage.get('deployment'),
@@ -205,35 +269,42 @@ class SecretScanner:
             
             match_found = False
             
-            # 1. Exact Value Match
-            if usage.get('value'):
-                for akv in akv_secrets:
-                    if akv.get('value') == usage.get('value'):
-                        row['akv_status'] = f"Synced with: {akv['name']}"
-                        row['akv_value'] = akv['value']
-                        row['akv_name_ref'] = akv['name']
-                        row['akv_expiry_status'] = akv['status']
-                        row['days_remaining'] = akv['days_remaining']
-                        match_found = True
-                        break
+            # Match Logic: Scoring System (Prioritize Name > Value)
+            best_candidate = None
+            max_score = -1
             
-            # 2. Key/Name Heuristic Match
-            if not match_found:
-                 for akv in akv_secrets:
-                    name_match = akv['name'].lower() in usage['secret_name'].lower()
-                    key_match = False
-                    if usage.get('key'):
-                        if usage['key'].lower() in akv['name'].lower():
-                            key_match = True
-                    
-                    if name_match or key_match:
-                         # Drift or Found
-                         row['akv_status'] = f"Drift: {akv['name']}"
-                         row['akv_value'] = akv['value']
-                         row['akv_name_ref'] = akv['name']
-                         row['akv_expiry_status'] = akv['status']
-                         row['days_remaining'] = akv['days_remaining']
-                         break
+            for akv in akv_secrets:
+                score = 0
+                
+                # 1. Name/Key Affinity (High Score)
+                name_match = akv['name'].lower() in usage['secret_name'].lower()
+                key_match = False
+                if usage.get('key'):
+                     # Strong signal: usage key (e.g. 'password') is in AKV name ('SQLPassword')
+                    if usage['key'].lower() in akv['name'].lower():
+                        key_match = True
+                
+                if key_match: score += 20
+                if name_match: score += 10
+                
+                # 2. Value Match (Medium Score)
+                val_match = False
+                if usage.get('value') and akv.get('value') == usage.get('value'):
+                    val_match = True
+                    score += 5
+                
+                if score > 0 and score > max_score:
+                    max_score = score
+                    best_candidate = akv
+            
+            if best_candidate:
+                is_synced = (best_candidate.get('value') == usage.get('value'))
+                prefix = "Synced with" if is_synced else "Drift"
+                row['akv_status'] = f"{prefix}: {best_candidate['name']}"
+                row['akv_value'] = best_candidate['value']
+                row['akv_name_ref'] = best_candidate['name']
+                row['akv_expiry_status'] = best_candidate['status']
+                row['days_remaining'] = best_candidate['days_remaining']
             
             dashboard_rows.append(row)
 

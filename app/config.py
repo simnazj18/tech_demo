@@ -7,6 +7,14 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: str = ""
     AZURE_KEYVAULT_URL: str = ""
     
+    # SMTP Configuration (Email Alerts)
+    SMTP_SERVER: str = "" 
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    ALERT_SENDER_EMAIL: str = ""
+    ALERT_RECEIVER_EMAIL: str = ""
+
     # Database & Security
     SQL_DATABASE_URL: str = "mssql+pyodbc://adminUser:P@ssw0rd123!@sql-server:1433/TechDemoDB?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
     SECRET_KEY: str = "supersecretkey" # Change in production

@@ -353,6 +353,7 @@
                                         <th>Expiry</th>
                                         <th>Status</th>
                                         <th class="text-end pe-4">Updated</th>
+                                        <th class="text-end pe-4">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -385,6 +386,70 @@
                                         <td class="text-end pe-4 text-muted small">{{
                                             secret.updated_on.strftime('%Y-%m-%d')
                                             if secret.updated_on else '-' }}</td>
+                                        <td class="text-end pe-4">
+                                            <button
+                                                class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 ms-auto"
+                                                data-bs-toggle="modal" data-bs-target="#rotateModalInv{{ loop.index }}">
+                                                <i class="bi bi-arrow-repeat"></i> Rotate
+                                            </button>
+
+                                            <!-- Rotation Modal (Inventory) -->
+                                            <div class="modal fade" id="rotateModalInv{{ loop.index }}" tabindex="-1">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content bg-dark border-secondary text-start">
+                                                        <div class="modal-header border-secondary">
+                                                            <h5 class="modal-title text-warning">Rotate Vault Secret
+                                                            </h5>
+                                                            <button type="button" class="btn-close btn-close-white"
+                                                                data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <p>Rotating <strong>{{ secret.name }}</strong> directly in
+                                                                Azure Key Vault.</p>
+                                                            <div
+                                                                class="alert alert-warning small bg-warning-subtle text-warning-emphasis border-0">
+                                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                <strong>Note:</strong> This will only update the secret
+                                                                in Azure. Kubernetes workloads will NOT be updated
+                                                                automatically unless mapped.
+                                                            </div>
+                                                            <form action="/secrets/rotate" method="POST"
+                                                                onsubmit="showLoading(this)">
+                                                                <input type="hidden" name="account_id"
+                                                                    value="{{ selected_account.id }}">
+                                                                <input type="hidden" name="akv_secret_name"
+                                                                    value="{{ secret.name }}">
+
+                                                                <!-- No K8s context for Inventory items -->
+                                                                <input type="hidden" name="k8s_secret_name" value="">
+                                                                <input type="hidden" name="deployment_name" value="">
+
+                                                                <div class="mb-3">
+                                                                    <label class="form-label text-secondary small">New
+                                                                        Secret Value</label>
+                                                                    <input type="text" name="new_secret_value"
+                                                                        class="form-control bg-dark text-light border-secondary"
+                                                                        placeholder="Auto-generate">
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label text-secondary small">New
+                                                                        Expiry Date</label>
+                                                                    <input type="date" name="new_expiry_date"
+                                                                        class="form-control bg-dark text-light border-secondary">
+                                                                </div>
+                                                                <button type="submit"
+                                                                    class="btn btn-warning fw-bold w-100">
+                                                                    <span
+                                                                        class="spinner-border spinner-border-sm d-none me-2"
+                                                                        role="status" aria-hidden="true"></span>
+                                                                    <span class="btn-text">Rotate Secret</span>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
