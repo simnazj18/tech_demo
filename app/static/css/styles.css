@@ -60,9 +60,19 @@ body {
 
 /* Navbar */
 .navbar {
-    z-index: 2000;
-    /* Ensure it stays on top */
+    z-index: 1020;
+    /* Ensure it stays on top but below modals */
 }
+
+/* Modals - Force high z-index to ensure visibility over navbar */
+.modal {
+    z-index: 10055 !important;
+}
+
+.modal-backdrop {
+    z-index: 10050 !important;
+}
+
 
 /* Service Selection Container */
 .min-vh-50 {

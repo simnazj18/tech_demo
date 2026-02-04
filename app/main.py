@@ -4,12 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 from app import models, schemas, auth
 from app.database import engine, get_db, init_db
 from app.services import SecretScanner
 from app.config import settings
+from sqlalchemy import desc
 
 # Create Tables
 models.Base.metadata.create_all(bind=engine)
@@ -74,6 +75,7 @@ async def dashboard(
     
     selected_account = None
     scan_data = {"akv_secrets": [], "k8s_usage": []}
+    audit_logs = []
     
     if account_id:
         selected_account = db.query(models.AzureAccount).filter(models.AzureAccount.id == account_id).first()
@@ -101,6 +103,10 @@ async def dashboard(
             scan_data["akv_secrets"] = data['akv_secrets']
         elif service_type == "all":
             scan_data = data
+            
+    # Fetch Audit Logs
+    if selected_account:
+        audit_logs = db.query(models.AuditLog).filter(models.AuditLog.account_id == selected_account.id).order_by(desc(models.AuditLog.timestamp)).all()
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -109,7 +115,8 @@ async def dashboard(
         "selected_account": selected_account,
         "service_type": service_type, 
         "akv_secrets": scan_data.get('akv_secrets', []),
-        "k8s_usage": scan_data.get('k8s_usage', [])
+        "k8s_usage": scan_data.get('k8s_usage', []),
+        "audit_logs": audit_logs
     })
 
 @app.post("/accounts/add")
@@ -183,6 +190,20 @@ async def rotate_secret(
     )
 
     print(f"Rotation Result: {result}")
+    
+    # Create Audit Log
+    log_status = "Success" if result["success"] else "Failed"
+    log_action = "Rotated"
+    log_entry = models.AuditLog(
+        timestamp=datetime.now(timezone.utc),
+        secret_name=akv_secret_name,
+        action=log_action,
+        status=log_status,
+        details=result["message"],
+        account_id=account.id
+    )
+    db.add(log_entry)
+    db.commit()
     
     if result["success"]:
         return RedirectResponse(

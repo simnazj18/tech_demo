@@ -57,7 +57,7 @@ class SecretScanner:
             print(f"Failed to load K8s config: {e}")
             self.v1 = None
 
-    def send_email_alert(self, secret_name: str, days_remaining: int):
+    def send_email_alert(self, secret_name: str, days_remaining: int, service_names: List[str] = None, vault_url: str = ""):
         """Send an email notification via SMTP."""
         smtp_server = settings.SMTP_SERVER
         smtp_port = settings.SMTP_PORT
@@ -69,6 +69,8 @@ class SecretScanner:
             print("Warning: SMTP settings not fully configured. Skipping email alert.")
             return
 
+        services_str = ", ".join(service_names) if service_names else "No active usage detected"
+        
         message = MIMEMultipart("alternative")
         message["Subject"] = f"🔥 Critical Secret Expiry: {secret_name}"
         message["From"] = sender_email
@@ -81,6 +83,10 @@ class SecretScanner:
         Days Remaining: {days_remaining}
         Status: CRITICAL
         
+        Service Environment: Azure Kubernetes Service (AKS)
+        Used By: {services_str}
+        Stored In: {vault_url}
+        
         Please rotate this secret immediately.
         """
         
@@ -91,6 +97,10 @@ class SecretScanner:
             <p><strong>Secret Name:</strong> {secret_name}</p>
             <p><strong>Days Remaining:</strong> {days_remaining}</p>
             <p><strong>Status:</strong> CRITICAL</p>
+            <hr>
+            <p><strong>Service Environment:</strong> Azure Kubernetes Service (AKS)</p>
+            <p><strong>Used By Services:</strong> {services_str}</p>
+            <p><strong>Vault Location:</strong> <a href="{vault_url}">{vault_url}</a></p>
             <p>Please rotate this secret immediately.</p>
           </body>
         </html>
@@ -140,8 +150,7 @@ class SecretScanner:
                          days_remaining = 0 # or negative? Let's keep 0 for simplified logic
                     elif days_remaining <= 2:
                         expiry_status = "Critical" # < 2 days
-                        # Trigger Alert
-                        self.send_email_alert(s.name, days_remaining)
+                        # Alert will be handled in get_dashboard_data to include service context
                     elif days_remaining <= 7:
                         expiry_status = "Warning" # < 7 days
                 
@@ -251,6 +260,9 @@ class SecretScanner:
         k8s_usage = self.get_k8s_usage()
         print(f"DEBUG: K8s Scan Complete. Found {len(k8s_usage)} usages.")
         
+        # Track usage per secret for alerting
+        secret_usage_map = {s['name']: [] for s in akv_secrets}
+
         dashboard_rows = []
         for usage in k8s_usage:
             print(f"DEBUG USAGE: Secret={usage['secret_name']} Key={usage.get('key')} Val={usage.get('value')}...")
@@ -305,8 +317,22 @@ class SecretScanner:
                 row['akv_name_ref'] = best_candidate['name']
                 row['akv_expiry_status'] = best_candidate['status']
                 row['days_remaining'] = best_candidate['days_remaining']
+                
+                # Record usage for alert context
+                if usage['pod'] not in secret_usage_map[best_candidate['name']]:
+                     secret_usage_map[best_candidate['name']].append(usage['pod'])
             
             dashboard_rows.append(row)
+
+        # Trigger Contextual Alerts
+        for akv in akv_secrets:
+            if akv['status'] == "Critical" and akv['days_remaining'] is not None:
+                self.send_email_alert(
+                    secret_name=akv['name'],
+                    days_remaining=akv['days_remaining'],
+                    service_names=secret_usage_map.get(akv['name'], []),
+                    vault_url=self.vault_url
+                )
 
         return {
             "akv_secrets": akv_secrets,

@@ -12,7 +12,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <link href="/static/css/styles.css" rel="stylesheet">
+    <link href="/static/css/styles.css?v=2.0" rel="stylesheet">
 </head>
 
 <body class="bg-dark text-light">
@@ -30,7 +30,7 @@
                 <!-- Account Selector -->
                 {% if user %}
                 <div class="dropdown">
-                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 text-light"
+                    <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2 text-black"
                         type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-cloud-fill text-primary"></i>
                         {% if selected_account %}{{ selected_account.name }}{% else %}Select Cloud Account{% endif %}
@@ -56,7 +56,7 @@
                 <!-- Service Selector -->
                 {% if selected_account and service_type %}
                 <div class="dropdown">
-                    <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 text-light"
+                    <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2 text-black"
                         type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-layers-fill text-warning"></i>
                         {% if service_type == 'aks' %}Kubernetes (AKS)
@@ -75,13 +75,14 @@
 
                 <!-- User Profile -->
                 <div class="dropdown">
-                    <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
+                    <a href="#"
+                        class="d-flex align-items-center text-black text-decoration-none dropdown-toggle bg-white rounded-pill pe-3"
                         data-bs-toggle="dropdown">
                         <div class="bg-info rounded-circle d-flex align-items-center justify-content-center text-dark fw-bold me-2"
                             style="width: 32px; height: 32px;">
                             {{ user.username[0] | upper }}
                         </div>
-                        <span class="d-none d-sm-inline">{{ user.username }}</span>
+                        <span class="d-none d-sm-inline fw-bold">{{ user.username }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow-lg">
                         <li><a class="dropdown-item text-danger" href="#" onclick="logout()"><i
@@ -120,7 +121,7 @@
                     <h2 class="fw-bold mb-3 text-white">Select Service</h2>
                     <p class="text-muted mb-4">Choose the service environment to inspect secrets.</p>
 
-                    <p class="text-muted mb-4">Choose the service environment to inspect secrets.</p>
+
 
                     <form action="/" method="get" class="d-grid gap-3" onsubmit="showLoading(this)">
                         <input type="hidden" name="account_id" value="{{ selected_account.id }}">
@@ -383,7 +384,7 @@
                                             <span class="badge bg-secondary">{{ secret.status }}</span>
                                             {% endif %}
                                         </td>
-                                        <td class="text-end pe-4 text-muted small">{{
+                                        <td class="text-end pe-4 text-white small">{{
                                             secret.updated_on.strftime('%Y-%m-%d')
                                             if secret.updated_on else '-' }}</td>
                                         <td class="text-end pe-4">
@@ -459,6 +460,66 @@
                 </div>
                 {% endif %}
             </div>
+
+            <!-- Audit Log Section -->
+            {% if selected_account %}
+            <div class="row mt-5">
+                <div class="col-12">
+                    <div class="card border-secondary bg-dark-subtle shadow-sm">
+                        <div class="card-header border-secondary bg-transparent py-3">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i>Audit Log /
+                                Recent Activity</h5>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover mb-0 align-middle">
+                                <thead class="text-secondary text-uppercase small">
+                                    <tr>
+                                        <th class="ps-4">Date & Time</th>
+                                        <th>Secret Name</th>
+                                        <th>Action</th>
+                                        <th>Status</th>
+                                        <th class="pe-4">Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if audit_logs %}
+                                    {% for log in audit_logs %}
+                                    <tr>
+                                        <td class="ps-4 text-white font-monospace small">
+                                            {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }} UTC
+                                        </td>
+                                        <td class="fw-bold text-light">{{ log.secret_name }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ log.action }}</span></td>
+                                        <td>
+                                            {% if log.status == 'Success' %}
+                                            <span
+                                                class="badge bg-success-subtle text-success border border-success-subtle"><i
+                                                    class="bi bi-check2 me-1"></i>Success</span>
+                                            {% else %}
+                                            <span
+                                                class="badge bg-danger-subtle text-danger border border-danger-subtle"><i
+                                                    class="bi bi-x me-1"></i>Failed</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="pe-4 text-white small">{{ log.details }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                                            No recent activity found.
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {% endif %}
         </div>
 

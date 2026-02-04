@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 from app.database import Base
 
 class User(Base):
@@ -24,3 +25,16 @@ class AzureAccount(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="accounts")
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.now(timezone.utc))
+    secret_name = Column(String(255))
+    action = Column(String(50)) # e.g., "Rotated"
+    status = Column(String(50)) # e.g., "Success", "Failed"
+    details = Column(String(500), nullable=True)
+    
+    account_id = Column(Integer, ForeignKey("azure_accounts.id"))
+    account = relationship("AzureAccount")
