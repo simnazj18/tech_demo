@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secrets-drift-dashboard
+  labels:
+    app: secrets-drift-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secrets-drift-dashboard
+  template:
+    metadata:
+      labels:
+        app: secrets-drift-dashboard
+    spec:
+      containers:
+      - name: secrets-drift-dashboard
+        image: REPLACE_WITH_ACR_IMAGE
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SQL_DATABASE_URL
+          value: "sqlite:////app/data/techdemo.db"
+        envFrom:
+        - secretRef:
+            name: app-env-secrets
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: secrets-drift-pvc
